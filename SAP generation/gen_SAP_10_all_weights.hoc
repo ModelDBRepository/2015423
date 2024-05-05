@@ -1,0 +1,119 @@
+{load_file("stdrun.hoc")}
+{load_file("import3d.hoc")}
+cvode_active(1)
+
+objref asc, gui
+asc = new Import3d_Neurolucida3()
+asc.input("oh140807_A0_idB.asc")
+gui = new Import3d_GUI(asc, 0) 
+gui.instantiate(nil) 
+
+celsius =34
+forall {insert pas cm=1 g_pas=1/30000 e_pas=-70}
+forsec "soma" {insert nax gbar_nax=0.2} 
+forsec "soma" {insert kdr gkdrbar_kdr=0.6}
+forsec "soma" {insert kmb gbar_kmb=0.015}
+
+tstop=600400 
+objref syn, nc, ns, istim, istim1, istim2, istim3, istim4, istim5, apc, tvect, out, out2, out3, out4, out5, out6, syncur, curt
+objref syni, nci, nsi, syncuri, curti, syncurv, currvecfile, currvec
+currvecfile= new File()
+currvec = new Vector()
+currvecfile.ropen("l23-06-13.res.6-tt6clu14_10.txt")
+i=0
+while (!currvecfile.eof()) {
+currvec.append(currvecfile.scanvar())
+}
+currvecfile.close()
+objref vs
+vs = new VecStim()
+vs.play(currvec)
+
+syncur = new Vector()
+curti = new Vector()
+ns = new NetStim(.5)
+ns.number=100000
+ns.interval = 100
+ns.start = 200
+ns.noise=1
+
+syncuri = new Vector()
+syncurv = new Vector()
+curti = new Vector()
+nsi = new NetStim(.5)
+nsi.number=100000
+nsi.interval = 10
+nsi.start = 400
+nsi.noise=1
+
+access soma
+
+syn = new Exp2i(.5)
+syn.tau1=0.5
+syn.tau2=20
+nc = new NetCon(vs, syn, 0, 0, 0)
+syncur.record(&syn.i, 0.1) 
+
+syni = new Exp2Syn(.5)
+syni.tau1=0.5
+syni.tau2=40
+syni.e=-90
+nci = new NetCon(nsi, syni, 0, 0, 0e-5)
+syncuri.record(&syni.i, 0.05) 
+syncurv.record(&v(0.05),0.1)
+load_file("tmp5.ses")
+
+out = new File()
+tvect = new Vector()
+apc = new APCount(.5)
+apc.record(tvect)
+objref tvec
+tvec = new Vector()
+tvec.record(&t,0.1)
+
+istim= new IClamp(.5)
+istim.del=200
+istim.dur=1000
+istim.amp=0
+curti.record(&istim.i,0.05)
+
+strdef sync, sync2
+out2 = new File()
+out3 = new File()
+out4 = new File()
+out5 = new File()
+out6 = new File()
+out.wopen("synoutI.txt")
+
+
+for (ww=50e-3; ww<2550e-3; ww=ww+100e-3) {
+nc.weight=ww
+nci.weight=0
+run()
+strdef trace
+sprint(trace,"trace_l23-06-13.res.6-tt6clu14_10_%g+%d.txt",ww,j)
+print trace
+out6.wopen(trace)
+for jj=0, syncur.size()-1 {out6.printf("%g\t %g\t %g\t \n",tvec.x[jj],syncur.x[jj]*1000,syncurv.x[jj])}
+out6.close()
+strdef tempi
+sprint(tempi,"tempi_l23-06-13.res.6-tt6clu14_10_%g+%d.txt",ww,j)
+print tempi
+out4.wopen(tempi)
+if (tvect.size()==0) {
+out4.printf("\n")
+} else {
+for jj=0, tvect.size()-1 {out4.printf("%.3f\n",tvect.x[jj])}
+out4.printf("\n")
+}
+tvect.resize(0)
+out4.close()
+out.printf("%g ",ww)
+}
+if (tvect.size()==0) {
+out.printf("\n")
+} else {
+for jj=0, tvect.size()-1 {out.printf("%d ",tvect.x[jj])}
+out.printf("\n")
+}
+tvect.resize(0)
